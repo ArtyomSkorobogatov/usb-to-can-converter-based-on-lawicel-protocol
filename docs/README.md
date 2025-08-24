@@ -1,4 +1,10 @@
-# CANable Firmware
+# USB to CAN adapter Lawicel-based
+
+Преобразователь USB в CAN, основанный на протоколе Lawicel.
+Проект является форком проекта https://github.com/normaldotcom/canable-fw.
+Адаптирован для работы с платой переходника CANable DykbRadio v1.0 Pro на базе STM32F072C8:
+![adapter-tot-view](images/CANable_top.png)
+![adapter-bottom-view](images/CANable_bottom.png)
 
 This repository contains sources for the slcan CANable firmware, based off of the CANtact firwmare. This firmware may still compile and run on the CANtact.
 
