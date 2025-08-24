@@ -1,2 +1,5 @@
 build/*
 /Default/
+/Drivers/CMSIS/DSP/
+.idea/
+
