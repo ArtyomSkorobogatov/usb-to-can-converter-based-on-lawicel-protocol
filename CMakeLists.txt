@@ -75,12 +75,18 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         Core/Src/slcan.c
         core/Src/printf.c
         Core/Src/error.c
+        Core/Src/utils_impl.c
+        lib/utils/RTT/SEGGER_RTT.c
+        lib/utils/RTT/SEGGER_RTT_printf.c
+        lib/utils/RTT/SEGGER_RTT_ASM_ARMv7M.S
 )
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
         # Add user defined include paths
         Core/Inc
+        lib/utils
+        lib/utils/RTT
 )
 
 # Add project symbols (macros)
