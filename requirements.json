@@ -1,0 +1,6 @@
+{
+  "git@github.com:Bastion-RND/mcu-lib-lang-c-utils.git": {
+    "path": "lib/utils",
+    "tag": "v1.0.6"
+  }
+}
