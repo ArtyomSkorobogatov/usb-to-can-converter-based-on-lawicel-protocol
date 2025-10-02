@@ -125,6 +125,8 @@ int main(void) {
         if (is_can_msg_pending(CAN_RX_FIFO0)) {
             // If message received from bus, parse the frame
             if (can_rx(&rx_msg_header, rx_msg_data) == HAL_OK) {
+                discrete_output_reset(&LedRed);
+                discrete_output_meander_start(&LedRed, 100, 0, 1);
                 uint16_t msg_len = slcan_parse_frame((uint8_t*) &msg_buf, &rx_msg_header, rx_msg_data);
 
                 // Transmit message via USB-CDC

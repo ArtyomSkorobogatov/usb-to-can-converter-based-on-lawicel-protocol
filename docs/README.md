@@ -8,6 +8,12 @@
 
 This repository contains sources for the slcan CANable firmware, based off of the CANtact firwmare. This firmware may still compile and run on the CANtact.
 
+## Светодиоды
+На плате расположены три светодиода: зелёный, красный и синий.
+Зелёный индицирует подачу питания на плату. Красный и синий управляются программно. Логика следующая:
+- синий светится постоянно, пока "открыто" Lawicel соединение;
+- красный вспыхивает в момент прохождения пакета на CAN-шине.
+
 ## Supported Commands
 
 - `O` - Open channel 
