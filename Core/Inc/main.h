@@ -24,6 +24,9 @@
 
 #ifdef __cplusplus
 extern "C" {
+
+
+
 #endif
 
 /* Includes ------------------------------------------------------------------*/
@@ -64,7 +67,12 @@ void Error_Handler(void);
 #define LED_BLUE_GPIO_Port GPIOA
 
 /* USER CODE BEGIN Private defines */
-
+#define CAN_BUS_RX_Pin GPIO_PIN_8
+#define CAN_BUS_RX_GPIO_Port GPIOB
+#define CAN_BUS_TX_Pin GPIO_PIN_9
+#define CAN_BUS_TX_GPIO_Port GPIOB
+#define CAN_BUS_CLK_ENA() __HAL_RCC_CAN1_CLK_ENABLE()
+#define CAN_BUS_PORT_CLK_ENA() __HAL_RCC_GPIOB_CLK_ENABLE()
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

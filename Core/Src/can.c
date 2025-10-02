@@ -20,26 +20,18 @@ static can_bus_state_t bus_state = OFF_BUS;
 static uint8_t can_autoretransmit = ENABLE;
 static can_txbuf_t txqueue = {0};
 
-
-// Initialize CAN peripheral settings, but don't actually start the peripheral
-void can_init(void)
-{
-    // Initialize GPIO for CAN transceiver 
+bool can_bus_init(void) {
     GPIO_InitTypeDef GPIO_InitStruct;
-    __HAL_RCC_CAN1_CLK_ENABLE();
-    __HAL_RCC_GPIOB_CLK_ENABLE();
-
-    //PB8     ------> CAN_RX
-    //PB9     ------> CAN_TX
-    GPIO_InitStruct.Pin = GPIO_PIN_8|GPIO_PIN_9;
+    CAN_BUS_CLK_ENA();
+    CAN_BUS_PORT_CLK_ENA();
+    GPIO_InitStruct.Pin = CAN_BUS_RX_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
     GPIO_InitStruct.Alternate = GPIO_AF4_CAN;
-    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-
-    // Initialize default CAN filter configuration
+    HAL_GPIO_Init(CAN_BUS_RX_GPIO_Port, &GPIO_InitStruct);
+    GPIO_InitStruct.Pin = CAN_BUS_TX_Pin;
+    HAL_GPIO_Init(CAN_BUS_TX_GPIO_Port, &GPIO_InitStruct);
     filter.FilterIdHigh = 0;
     filter.FilterIdLow = 0;
     filter.FilterMaskIdHigh = 0;
@@ -49,8 +41,6 @@ void can_init(void)
     filter.FilterMode = CAN_FILTERMODE_IDMASK;
     filter.FilterScale = CAN_FILTERSCALE_32BIT;
     filter.FilterActivation = ENABLE;
-
-
     // default to 125 kbit/s
     prescaler = 48;
     can_handle.Instance = CAN;
@@ -58,9 +48,8 @@ void can_init(void)
 
     HAL_NVIC_SetPriority(CEC_CAN_IRQn, 1, 0);
     HAL_NVIC_EnableIRQ(CEC_CAN_IRQn);
-
+    return true;
 }
-
 
 // Start the CAN peripheral
 void can_enable(void)
@@ -232,12 +221,11 @@ void can_process(void)
 	}
 }
 
-
-// Receive message from the CAN bus RXFIFO
-uint32_t can_rx(CAN_RxHeaderTypeDef *rx_msg_header, uint8_t* rx_msg_data)
-{
-    uint32_t status = HAL_CAN_GetRxMessage(&can_handle, CAN_RX_FIFO0, rx_msg_header, rx_msg_data);
-    return status;
+bool incoming_can_msg_pop(CAN_RxHeaderTypeDef *rx_msg_header, uint8_t* rx_msg_data) {
+    HAL_StatusTypeDef Status = HAL_CAN_GetRxMessage(&can_handle, CAN_RX_FIFO0, rx_msg_header, rx_msg_data);
+    if (Status == HAL_OK)
+        return true;
+    return false;
 }
 
 uint32_t is_can_msg_pending(void) {

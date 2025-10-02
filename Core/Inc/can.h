@@ -36,16 +36,14 @@ typedef struct cantxbuf_
 	uint8_t full; // TODO: Set this when we are full, clear when the tail moves one.
 } can_txbuf_t;
 
-
-// Prototypes
-void can_init(void);
+bool can_bus_init(void);
 void can_enable(void);
 void can_disable(void);
 void can_set_bitrate(enum can_bitrate bitrate);
 void can_set_silent(uint8_t silent);
 void can_set_autoretransmit(uint8_t autoretransmit);
 uint32_t can_tx(CAN_TxHeaderTypeDef *tx_msg_header, uint8_t *tx_msg_data);
-uint32_t can_rx(CAN_RxHeaderTypeDef *rx_msg_header, uint8_t *rx_msg_data);
+bool incoming_can_msg_pop(CAN_RxHeaderTypeDef *rx_msg_header, uint8_t *rx_msg_data);
 
 
 void can_process(void);

@@ -12,8 +12,8 @@
 #include "utils_conf.h"
 
 // Parse an incoming CAN frame into an outgoing slcan message
-int8_t slcan_parse_frame(uint8_t* buf, CAN_RxHeaderTypeDef* frame_header, uint8_t* frame_data) {
-    uint8_t msg_position = 0;
+size_t slcan_parse_frame(uint8_t* buf, CAN_RxHeaderTypeDef* frame_header, const uint8_t* frame_data) {
+    size_t msg_position = 0;
 
     for (uint8_t j = 0; j < SLCAN_MTU; j++) {
         buf[j] = '\0';

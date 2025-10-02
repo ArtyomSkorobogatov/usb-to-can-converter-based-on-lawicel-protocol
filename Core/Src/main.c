@@ -96,24 +96,21 @@ int main(void) {
     // MX_CAN_Init();
     MX_USB_DEVICE_Init();
     /* USER CODE BEGIN 2 */
-    if (!discrete_output_init(&LedRed, DiscreteOutputActiveLevel_LOW, LED_RED_ID)) {
+    if (!can_bus_init())
         Error_Handler();
-    }
-    if (!discrete_output_init(&LedBlue, DiscreteOutputActiveLevel_LOW, LED_BLUE_ID)) {
+    if (!discrete_output_init(&LedRed, DiscreteOutputActiveLevel_LOW, LED_RED_ID))
         Error_Handler();
-    }
-    can_init();
+    if (!discrete_output_init(&LedBlue, DiscreteOutputActiveLevel_LOW, LED_BLUE_ID))
+        Error_Handler();
     /* USER CODE END 2 */
 
     /* Infinite loop */
     /* USER CODE BEGIN WHILE */
     discrete_output_meander_start(&LedRed, 500, 500, 2);
     discrete_output_meander_start(&LedBlue, 500, 500, 2);
-
-    // Storage for status and received message buffer
     CAN_RxHeaderTypeDef rx_msg_header;
-    uint8_t rx_msg_data[8] = {0};
-    uint8_t msg_buf[SLCAN_MTU];
+    uint8_t rx_can_frame_buf[8] = {0};
+    uint8_t cdc_message_buf[SLCAN_MTU];
     debug_printf("\nProgram started\n");
 
     while (1) {
@@ -122,16 +119,12 @@ int main(void) {
         discrete_output_run(&LedRed);
         discrete_output_run(&LedBlue);
         if (is_can_msg_pending() != 0) {
-            // If message received from bus, parse the frame
-            if (can_rx(&rx_msg_header, rx_msg_data) == HAL_OK) {
+            if (incoming_can_msg_pop(&rx_msg_header, rx_can_frame_buf)) {
                 discrete_output_reset(&LedRed);
                 discrete_output_meander_start(&LedRed, 100, 0, 1);
-                uint16_t msg_len = slcan_parse_frame((uint8_t*) &msg_buf, &rx_msg_header, rx_msg_data);
-
-                // Transmit message via USB-CDC
-                if (msg_len) {
-                    CDC_Transmit_FS(msg_buf, msg_len);
-                }
+                size_t cdc_msg_len = slcan_parse_frame((uint8_t*) &cdc_message_buf, &rx_msg_header, rx_can_frame_buf);
+                if (cdc_msg_len)
+                    CDC_Transmit_FS(cdc_message_buf, cdc_msg_len);
             }
         }
         /* USER CODE END WHILE */
