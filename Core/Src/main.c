@@ -119,7 +119,8 @@ int main(void) {
     while (1) {
         cdc_process();
         can_process();
-
+        discrete_output_run(&LedRed);
+        discrete_output_run(&LedBlue);
         // If CAN message receive is pending, process the message
         if (is_can_msg_pending(CAN_RX_FIFO0)) {
             // If message received from bus, parse the frame
