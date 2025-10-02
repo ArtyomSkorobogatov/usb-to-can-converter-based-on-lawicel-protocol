@@ -23,7 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "can.h"
-#include "led.h"
+#include "discrete_output.h"
 #include "slcan.h"
 #include "utils_conf.h"
 #include "usbd_cdc_if.h"
@@ -48,7 +48,8 @@
 CAN_HandleTypeDef hcan;
 
 /* USER CODE BEGIN PV */
-
+DiscreteOutput_t LedRed;
+DiscreteOutput_t LedBlue;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -95,12 +96,19 @@ int main(void) {
     // MX_CAN_Init();
     MX_USB_DEVICE_Init();
     /* USER CODE BEGIN 2 */
+    if (!discrete_output_init(&LedRed, DiscreteOutputActiveLevel_LOW, LED_RED_ID)) {
+        Error_Handler();
+    }
+    if (!discrete_output_init(&LedBlue, DiscreteOutputActiveLevel_LOW, LED_BLUE_ID)) {
+        Error_Handler();
+    }
     can_init();
     /* USER CODE END 2 */
 
     /* Infinite loop */
     /* USER CODE BEGIN WHILE */
-    leds_test_blink(2);
+    discrete_output_meander_start(&LedRed, 500, 500, 2);
+    discrete_output_meander_start(&LedBlue, 500, 500, 2);
 
     // Storage for status and received message buffer
     CAN_RxHeaderTypeDef rx_msg_header;
@@ -110,7 +118,6 @@ int main(void) {
 
     while (1) {
         cdc_process();
-        led_process();
         can_process();
 
         // If CAN message receive is pending, process the message

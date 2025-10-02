@@ -69,16 +69,17 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         # Add user sources here
-        Core/Src/led.c
         Core/Src/can.c
         Core/Src/system.c
         Core/Src/slcan.c
         core/Src/printf.c
         Core/Src/error.c
         Core/Src/utils_impl.c
+        Core/Src/discrete_output_impl.c
         lib/utils/RTT/SEGGER_RTT.c
         lib/utils/RTT/SEGGER_RTT_printf.c
         lib/utils/RTT/SEGGER_RTT_ASM_ARMv7M.S
+        lib/discrete_io/discrete_output.c
 )
 
 # Add include paths
@@ -87,6 +88,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
         Core/Inc
         lib/utils
         lib/utils/RTT
+        lib/discrete_io
 )
 
 # Add project symbols (macros)
