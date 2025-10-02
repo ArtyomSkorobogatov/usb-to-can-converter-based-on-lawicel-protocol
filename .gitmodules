@@ -1,3 +1,6 @@
 [submodule "lib/utils"]
 	path = lib/utils
 	url = git@github.com:Bastion-RND/mcu-lib-lang-c-utils.git
+[submodule "lib/discrete_io"]
+	path = lib/discrete_io
+	url = git@github.com:Bastion-RND/mcu-lib-lang-c-discrete-io.git

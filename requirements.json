@@ -2,5 +2,9 @@
   "git@github.com:Bastion-RND/mcu-lib-lang-c-utils.git": {
     "path": "lib/utils",
     "tag": "v1.0.6"
+  },
+  "git@github.com:Bastion-RND/mcu-lib-lang-c-discrete-io.git": {
+    "path": "lib/discrete_io",
+    "tag": "v1.0.2"
   }
 }
