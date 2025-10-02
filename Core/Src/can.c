@@ -240,15 +240,10 @@ uint32_t can_rx(CAN_RxHeaderTypeDef *rx_msg_header, uint8_t* rx_msg_data)
     return status;
 }
 
-
-// Check if a CAN message has been received and is waiting in the FIFO
-uint8_t is_can_msg_pending(uint8_t fifo)
-{
+uint32_t is_can_msg_pending(void) {
     if (bus_state == OFF_BUS)
-    {
         return 0;
-    }
-    return(HAL_CAN_GetRxFifoFillLevel(&can_handle, CAN_RX_FIFO0) > 0);
+    return HAL_CAN_GetRxFifoFillLevel(&can_handle, CAN_RX_FIFO0);
 }
 
 
