@@ -22,7 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "can.h"
+#include "prj_can.h"
 #include "discrete_output.h"
 #include "slcan.h"
 #include "utils_conf.h"
@@ -45,17 +45,16 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-CAN_HandleTypeDef hcan;
 
 /* USER CODE BEGIN PV */
 DiscreteOutput_t LedRed;
 DiscreteOutput_t LedBlue;
+uint8_t cdc_message_buf[SLCAN_MTU];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_CAN_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -93,10 +92,9 @@ int main(void) {
 
     /* Initialize all configured peripherals */
     MX_GPIO_Init();
-    // MX_CAN_Init();
     MX_USB_DEVICE_Init();
     /* USER CODE BEGIN 2 */
-    if (!can_bus_init())
+    if (!prj_can_bus_init())
         Error_Handler();
     if (!discrete_output_init(&LedRed, DiscreteOutputActiveLevel_LOW, LED_RED_ID))
         Error_Handler();
@@ -108,25 +106,13 @@ int main(void) {
     /* USER CODE BEGIN WHILE */
     discrete_output_meander_start(&LedRed, 500, 500, 2);
     discrete_output_meander_start(&LedBlue, 500, 500, 2);
-    CAN_RxHeaderTypeDef rx_msg_header;
-    uint8_t rx_can_frame_buf[8] = {0};
-    uint8_t cdc_message_buf[SLCAN_MTU];
     debug_printf("\nProgram started\n");
 
     while (1) {
         cdc_process();
-        can_process();
         discrete_output_run(&LedRed);
         discrete_output_run(&LedBlue);
-        if (is_can_msg_pending() != 0) {
-            if (incoming_can_msg_pop(&rx_msg_header, rx_can_frame_buf)) {
-                discrete_output_reset(&LedRed);
-                discrete_output_meander_start(&LedRed, 100, 0, 1);
-                size_t cdc_msg_len = slcan_parse_frame((uint8_t*) &cdc_message_buf, &rx_msg_header, rx_can_frame_buf);
-                if (cdc_msg_len)
-                    CDC_Transmit_FS(cdc_message_buf, cdc_msg_len);
-            }
-        }
+        prj_can_bus_run();
         /* USER CODE END WHILE */
 
         /* USER CODE BEGIN 3 */
@@ -169,40 +155,6 @@ void SystemClock_Config(void) {
     if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK) {
         Error_Handler();
     }
-}
-
-/**
- * @brief CAN Initialization Function
- * @param None
- * @retval None
- */
-static void MX_CAN_Init(void) {
-
-    /* USER CODE BEGIN CAN_Init 0 */
-
-    /* USER CODE END CAN_Init 0 */
-
-    /* USER CODE BEGIN CAN_Init 1 */
-
-    /* USER CODE END CAN_Init 1 */
-    hcan.Instance                  = CAN;
-    hcan.Init.Prescaler            = 16;
-    hcan.Init.Mode                 = CAN_MODE_NORMAL;
-    hcan.Init.SyncJumpWidth        = CAN_SJW_1TQ;
-    hcan.Init.TimeSeg1             = CAN_BS1_1TQ;
-    hcan.Init.TimeSeg2             = CAN_BS2_1TQ;
-    hcan.Init.TimeTriggeredMode    = DISABLE;
-    hcan.Init.AutoBusOff           = DISABLE;
-    hcan.Init.AutoWakeUp           = DISABLE;
-    hcan.Init.AutoRetransmission   = DISABLE;
-    hcan.Init.ReceiveFifoLocked    = DISABLE;
-    hcan.Init.TransmitFifoPriority = DISABLE;
-    if (HAL_CAN_Init(&hcan) != HAL_OK) {
-        Error_Handler();
-    }
-    /* USER CODE BEGIN CAN_Init 2 */
-
-    /* USER CODE END CAN_Init 2 */
 }
 
 /**

@@ -71,17 +71,19 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         # Add user sources here
-        Core/Src/can.c
+        Core/Src/prj_can.c
         Core/Src/system.c
         Core/Src/slcan.c
         core/Src/printf.c
         Core/Src/error.c
         Core/Src/utils_impl.c
         Core/Src/discrete_output_impl.c
+        lib/utils/src/utils.c
         lib/utils/src/RTT/SEGGER_RTT.c
         lib/utils/src/RTT/SEGGER_RTT_printf.c
         lib/utils/src/RTT/SEGGER_RTT_ASM_ARMv7M.S
         lib/discrete_io/discrete_output.c
+        lib/circular_buffer/circular-buffer.c
 )
 
 # Add include paths
@@ -91,6 +93,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
         lib/utils/src
         lib/utils/src/RTT
         lib/discrete_io
+        lib/circular_buffer
 )
 
 # Add project symbols (macros)

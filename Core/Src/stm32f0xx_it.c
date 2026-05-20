@@ -20,6 +20,8 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "stm32f0xx_it.h"
+
+#include "prj_can.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 /* USER CODE END Includes */
@@ -56,7 +58,7 @@
 
 /* External variables --------------------------------------------------------*/
 extern PCD_HandleTypeDef hpcd_USB_FS;
-extern CAN_HandleTypeDef hcan;
+extern CAN_HandleTypeDef can_bus_handle;
 /* USER CODE BEGIN EV */
 
 /* USER CODE END EV */
@@ -147,9 +149,9 @@ void SysTick_Handler(void)
 void CEC_CAN_IRQHandler(void)
 {
   /* USER CODE BEGIN CEC_CAN_IRQn 0 */
-
+  CAN_HandleTypeDef* handle = prj_can_bus_get_handle();
   /* USER CODE END CEC_CAN_IRQn 0 */
-  HAL_CAN_IRQHandler(&hcan);
+  HAL_CAN_IRQHandler(handle);
   /* USER CODE BEGIN CEC_CAN_IRQn 1 */
 
   /* USER CODE END CEC_CAN_IRQn 1 */

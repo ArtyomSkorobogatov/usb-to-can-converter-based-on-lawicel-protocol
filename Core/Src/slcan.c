@@ -4,7 +4,7 @@
 
 #include "slcan.h"
 #include <string.h>
-#include "can.h"
+#include "prj_can.h"
 #include "error.h"
 #include "printf.h"
 #include "stm32f0xx_hal.h"
@@ -12,7 +12,7 @@
 #include "utils_conf.h"
 
 // Parse an incoming CAN frame into an outgoing slcan message
-size_t slcan_parse_frame(uint8_t* buf, CAN_RxHeaderTypeDef* frame_header, const uint8_t* frame_data) {
+size_t slcan_parse_frame(uint8_t* buf, const rxCanBusFrame_t* frame) {
     size_t msg_position = 0;
 
     for (uint8_t j = 0; j < SLCAN_MTU; j++) {
@@ -20,22 +20,22 @@ size_t slcan_parse_frame(uint8_t* buf, CAN_RxHeaderTypeDef* frame_header, const 
     }
 
     // Add character for frame type
-    if (frame_header->RTR == CAN_RTR_DATA) {
+    if (frame->Header.RTR == CAN_RTR_DATA) {
         buf[msg_position] = 't';
-    } else if (frame_header->RTR == CAN_RTR_REMOTE) {
+    } else if (frame->Header.RTR == CAN_RTR_REMOTE) {
         buf[msg_position] = 'r';
     }
 
     // Assume standard identifier
     uint8_t id_len  = SLCAN_STD_ID_LEN;
-    uint32_t can_id = frame_header->StdId;
+    uint32_t can_id = frame->Header.StdId;
 
     // Check if extended
-    if (frame_header->IDE == CAN_ID_EXT) {
+    if (frame->Header.IDE == CAN_ID_EXT) {
         // Convert first char to upper case for extended frame
         buf[msg_position] -= 32;
         id_len = SLCAN_EXT_ID_LEN;
-        can_id = frame_header->ExtId;
+        can_id = frame->Header.ExtId;
     }
     msg_position++;
 
@@ -48,12 +48,12 @@ size_t slcan_parse_frame(uint8_t* buf, CAN_RxHeaderTypeDef* frame_header, const 
     }
 
     // Add DLC to buffer
-    buf[msg_position++] = frame_header->DLC;
+    buf[msg_position++] = frame->Header.DLC;
 
     // Add data bytes
-    for (uint8_t j = 0; j < frame_header->DLC; j++) {
-        buf[msg_position++] = (frame_data[j] >> 4);
-        buf[msg_position++] = (frame_data[j] & 0x0F);
+    for (uint8_t j = 0; j < frame->Header.DLC; j++) {
+        buf[msg_position++] = (frame->Body[j] >> 4);
+        buf[msg_position++] = (frame->Body[j] & 0x0F);
     }
 
     // Convert to ASCII (2nd character to end)
@@ -72,15 +72,24 @@ size_t slcan_parse_frame(uint8_t* buf, CAN_RxHeaderTypeDef* frame_header, const 
     return msg_position;
 }
 
+static void _print_cdc(uint8_t* buf, uint8_t len) {
+    debug_printf("CDC Command: ");
+    for (uint8_t i = 0; i < len; i++){
+        debug_printf("%c", buf[i]);
+    }
+    debug_printf("\n");
+}
+
 
 // Parse an incoming slcan command from the USB CDC port
 int8_t slcan_parse_str(uint8_t* buf, uint8_t len) {
-    CAN_TxHeaderTypeDef frame_header;
-
+    // CAN_TxHeaderTypeDef frame_header;
+    _print_cdc(buf, len);
+    txCanBusFrame_t Frame = {0};
     // Default to standard ID unless otherwise specified
-    frame_header.IDE   = CAN_ID_STD;
-    frame_header.StdId = 0;
-    frame_header.ExtId = 0;
+    Frame.Header.IDE   = CAN_ID_STD;
+    Frame.Header.StdId = 0;
+    Frame.Header.ExtId = 0;
 
 
     // Convert from ASCII (2nd character to end)
@@ -99,53 +108,44 @@ int8_t slcan_parse_str(uint8_t* buf, uint8_t len) {
     switch (buf[0]) {
         case 'O':
             debug_printf("OPEN command\n");
-            can_enable();
+            prj_can_bus_enable();
             return 0;
-
         case 'C':
             debug_printf("CLOSE command\n");
-            can_disable();
+            prj_can_bus_disable();
             return 0;
-
         case 'S':
-            debug_printf("SET BITRATE command, value: %d\n", buf[1]);
+            debug_printf("SET BITRATE command, value=%d\n", buf[1]);
             if (buf[1] >= CAN_BITRATE_INVALID) {
                 return -1;
             }
-            can_set_bitrate(buf[1]);
+            prj_can_bus_set_bitrate(buf[1]);
             return 0;
-
         case 'm':
         case 'M':
             // Set mode command
             if (buf[1] == 1) {
                 // Mode 1: silent
-                can_set_silent(1);
+                prj_can_bus_set_silent(1);
             } else {
                 // Default to normal mode
-                can_set_silent(0);
+                prj_can_bus_set_silent(0);
             }
             return 0;
-
         case 'a':
         case 'A':
-            // Set autoretry command
             if (buf[1] == 1) {
-                // Mode 1: autoretry enabled (default)
-                can_set_autoretransmit(1);
+                prj_can_bus_set_auto_retransmit(true);
             } else {
-                // Mode 0: autoretry disabled
-                can_set_autoretransmit(0);
+                prj_can_bus_set_auto_retransmit(false);
             }
             return 0;
-
         case 'V': {
             // Report firmware version and remote
             // char* fw_id = GIT_VERSION " " GIT_REMOTE "\r"; // TODO
             // CDC_Transmit_FS((uint8_t*)fw_id, strlen(fw_id));
             return 0;
         }
-
         // Nonstandard!
         case 'E': {
             // Report error register
@@ -154,57 +154,51 @@ int8_t slcan_parse_str(uint8_t* buf, uint8_t len) {
             CDC_Transmit_FS((uint8_t*) errstr, strlen(errstr));
             return 0;
         }
-
         case 'T':
-            frame_header.IDE = CAN_ID_EXT;
-        case 't':
-            // Transmit data frame command
-            frame_header.RTR = CAN_RTR_DATA;
+            Frame.Header.IDE = CAN_ID_EXT;
             break;
-
+        case 't':
+            Frame.Header.RTR = CAN_RTR_DATA;
+            break;
         case 'R':
-            frame_header.IDE = CAN_ID_EXT;
+            Frame.Header.IDE = CAN_ID_EXT;
+            break;
         case 'r':
             // Transmit remote frame command
-            frame_header.RTR = CAN_RTR_REMOTE;
+            Frame.Header.RTR = CAN_RTR_REMOTE;
             break;
-
         default:
-            // Error, unknown command
+            debug_printf("ERROR: unknown command=%d\n", buf[0]);
             return -1;
     }
 
 
     // Save CAN ID depending on ID type
     uint8_t msg_position = 1;
-    if (frame_header.IDE == CAN_ID_EXT) {
+    if (Frame.Header.IDE == CAN_ID_EXT) {
         while (msg_position <= SLCAN_EXT_ID_LEN) {
-            frame_header.ExtId *= 16;
-            frame_header.ExtId += buf[msg_position++];
+            Frame.Header.ExtId *= 16;
+            Frame.Header.ExtId += buf[msg_position++];
         }
     } else {
         while (msg_position <= SLCAN_STD_ID_LEN) {
-            frame_header.StdId *= 16;
-            frame_header.StdId += buf[msg_position++];
+            Frame.Header.StdId *= 16;
+            Frame.Header.StdId += buf[msg_position++];
         }
     }
 
 
     // Attempt to parse DLC and check sanity
-    frame_header.DLC = buf[msg_position++];
-    if (frame_header.DLC > 8) {
+    Frame.Header.DLC = buf[msg_position++];
+    if (Frame.Header.DLC > 8) {
         return -1;
     }
 
     // Copy frame data to buffer
-    uint8_t frame_data[8] = {0};
-    for (uint8_t j = 0; j < frame_header.DLC; j++) {
-        frame_data[j] = (buf[msg_position] << 4) + buf[msg_position + 1];
+    for (uint8_t j = 0; j < Frame.Header.DLC; j++) {
+        Frame.Body[j] = (buf[msg_position] << 4) + buf[msg_position + 1];
         msg_position += 2;
     }
-
-    // Transmit the message
-    can_tx(&frame_header, frame_data);
-
+    prj_can_bus_send(&Frame);
     return 0;
 }
