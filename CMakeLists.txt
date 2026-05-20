@@ -56,7 +56,9 @@ message("Build type: " ${CMAKE_BUILD_TYPE})
 enable_language(C ASM)
 
 # Create an executable object type
-add_executable(${CMAKE_PROJECT_NAME})
+add_executable(${CMAKE_PROJECT_NAME}
+        Core/Src/main.c
+)
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
@@ -76,9 +78,9 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         Core/Src/error.c
         Core/Src/utils_impl.c
         Core/Src/discrete_output_impl.c
-        lib/utils/RTT/SEGGER_RTT.c
-        lib/utils/RTT/SEGGER_RTT_printf.c
-        lib/utils/RTT/SEGGER_RTT_ASM_ARMv7M.S
+        lib/utils/src/RTT/SEGGER_RTT.c
+        lib/utils/src/RTT/SEGGER_RTT_printf.c
+        lib/utils/src/RTT/SEGGER_RTT_ASM_ARMv7M.S
         lib/discrete_io/discrete_output.c
 )
 
@@ -86,8 +88,8 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
         # Add user defined include paths
         Core/Inc
-        lib/utils
-        lib/utils/RTT
+        lib/utils/src
+        lib/utils/src/RTT
         lib/discrete_io
 )
 
@@ -101,4 +103,15 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
         stm32cubemx
 
         # Add user defined libraries
+)
+
+add_custom_command(TARGET ${CMAKE_PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_OBJCOPY} -O ihex
+        $<TARGET_FILE:${CMAKE_PROJECT_NAME}>
+        ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_PROJECT_NAME}.hex
+        COMMAND ${CMAKE_OBJCOPY} -O binary
+        $<TARGET_FILE:${CMAKE_PROJECT_NAME}>
+        ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_PROJECT_NAME}.bin
+        COMMENT "Generating HEX and BIN files"
+        VERBATIM
 )
