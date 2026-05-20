@@ -150,7 +150,6 @@ int8_t slcan_parse_str(uint8_t* buf, uint8_t len) {
         case 'E': {
             // Report error register
             char errstr[64] = {0};
-            snprintf_(errstr, 64, "CANable Error Register: %X", (unsigned int) error_reg());
             CDC_Transmit_FS((uint8_t*) errstr, strlen(errstr));
             return 0;
         }

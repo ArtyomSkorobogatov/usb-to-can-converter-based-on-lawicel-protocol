@@ -74,7 +74,6 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         Core/Src/prj_can.c
         Core/Src/system.c
         Core/Src/slcan.c
-        core/Src/printf.c
         Core/Src/error.c
         Core/Src/utils_impl.c
         Core/Src/discrete_output_impl.c

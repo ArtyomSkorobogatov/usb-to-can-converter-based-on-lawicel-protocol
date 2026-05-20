@@ -22,11 +22,11 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "prj_can.h"
 #include "discrete_output.h"
+#include "prj_can.h"
 #include "slcan.h"
-#include "utils_conf.h"
 #include "usbd_cdc_if.h"
+#include "utils_conf.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -69,7 +69,6 @@ static void MX_GPIO_Init(void);
  * @retval int
  */
 int main(void) {
-
     /* USER CODE BEGIN 1 */
 
     /* USER CODE END 1 */
