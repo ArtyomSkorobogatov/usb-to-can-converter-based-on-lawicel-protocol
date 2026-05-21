@@ -1,13 +1,25 @@
-//
-// slcan: Parse incoming and generate outgoing slcan messages
-//
-
 #include "slcan.h"
 #include <string.h>
 #include "prj_can.h"
 #include "prj_cdc_usb.h"
 #include "stm32f0xx_hal.h"
 #include "utils_conf.h"
+
+static bool slcan_hex_to_u4(uint8_t c, uint8_t* out) {
+    if (c >= '0' && c <= '9') {
+        *out = c - '0';
+        return true;
+    }
+    if (c >= 'A' && c <= 'F') {
+        *out = c - 'A' + 10;
+        return true;
+    }
+    if (c >= 'a' && c <= 'f') {
+        *out = c - 'a' + 10;
+        return true;
+    }
+    return false;
+}
 
 // Parse an incoming CAN frame into an outgoing slcan message
 size_t slcan_parse_frame(uint8_t* buf, const rxCanBusFrame_t* frame) {
@@ -49,13 +61,13 @@ size_t slcan_parse_frame(uint8_t* buf, const rxCanBusFrame_t* frame) {
     buf[msg_position++] = frame->Header.DLC;
 
     // Add data bytes
-    for (uint8_t j = 0; j < frame->Header.DLC; j++) {
+    for (size_t j = 0; j < frame->Header.DLC; j++) {
         buf[msg_position++] = (frame->Body[j] >> 4);
         buf[msg_position++] = (frame->Body[j] & 0x0F);
     }
 
     // Convert to ASCII (2nd character to end)
-    for (uint8_t j = 1; j < msg_position; j++) {
+    for (size_t j = 1; j < msg_position; j++) {
         if (buf[j] < 0xA) {
             buf[j] += 0x30;
         } else {
@@ -70,66 +82,52 @@ size_t slcan_parse_frame(uint8_t* buf, const rxCanBusFrame_t* frame) {
     return msg_position;
 }
 
-
-// Parse an incoming slcan command from the USB CDC port
 int8_t slcan_parse_str(uint8_t* buf, uint8_t len) {
-    // CAN_TxHeaderTypeDef frame_header;
+    if (buf == NULL || len == 0)
+        return -1;
     txCanBusFrame_t Frame = {0};
-    // Default to standard ID unless otherwise specified
-    Frame.Header.IDE   = CAN_ID_STD;
-    Frame.Header.StdId = 0;
-    Frame.Header.ExtId = 0;
-
-
-    // Convert from ASCII (2nd character to end)
-    for (uint8_t i = 1; i < len; i++) {
-        // Lowercase letters
-        if (buf[i] >= 'a')
-            buf[i] = buf[i] - 'a' + 10;
-        // Uppercase letters
-        else if (buf[i] >= 'A')
-            buf[i] = buf[i] - 'A' + 10;
-        // Numbers
-        else
-            buf[i] = buf[i] - '0';
-    }
-
+    Frame.Header.IDE      = CAN_ID_STD;
+    Frame.Header.RTR      = CAN_RTR_DATA;
     switch (buf[0]) {
         case 'O':
+            if (len != 1)
+                return -1;
             debug_printf("OPEN command\n");
             prj_can_bus_enable();
             return 0;
         case 'C':
+            if (len != 1)
+                return -1;
             debug_printf("CLOSE command\n");
             prj_can_bus_disable();
             return 0;
-        case 'S':
-            debug_printf("SET BITRATE command, value=%d\n", buf[1]);
-            if (buf[1] >= CAN_BITRATE_INVALID) {
+        case 'S': {
+            uint8_t bitrate;
+            if (len != 2 || !slcan_hex_to_u4(buf[1], &bitrate))
                 return -1;
-            }
-            prj_can_bus_set_bitrate(buf[1]);
-            return 0;
+            debug_printf("SET BITRATE command, value=%d\n", bitrate);
+            if (bitrate >= CAN_BITRATE_INVALID)
+                return -1;
+            return prj_can_bus_set_bitrate((enum can_bitrate) bitrate) ? 0 : -1;
+        }
         case 'm':
-        case 'M':
-            // Set mode command
-            if (buf[1] == 1) {
-                // Mode 1: silent
-                prj_can_bus_set_silent(1);
-            } else {
-                // Default to normal mode
-                prj_can_bus_set_silent(0);
-            }
-            return 0;
+        case 'M': {
+            uint8_t mode;
+            if (len != 2 || !slcan_hex_to_u4(buf[1], &mode) || mode > 1)
+                return -1;
+            return prj_can_bus_set_silent(mode == 1) ? 0 : -1;
+        }
         case 'a':
-        case 'A':
-            if (buf[1] == 1) {
-                prj_can_bus_set_auto_retransmit(true);
-            } else {
-                prj_can_bus_set_auto_retransmit(false);
-            }
+        case 'A': {
+            uint8_t enable;
+            if (len != 2 || !slcan_hex_to_u4(buf[1], &enable) || enable > 1)
+                return -1;
+            prj_can_bus_set_auto_retransmit(enable == 1);
             return 0;
+        }
         case 'V': {
+            if (len != 1)
+                return -1;
             // Report firmware version and remote
             // char* fw_id = GIT_VERSION " " GIT_REMOTE "\r"; // TODO
             // CDC_Transmit_FS((uint8_t*)fw_id, strlen(fw_id));
@@ -137,7 +135,8 @@ int8_t slcan_parse_str(uint8_t* buf, uint8_t len) {
         }
         // Nonstandard!
         case 'E': {
-            // Report error register
+            if (len != 1)
+                return -1;
             char errstr[64] = {0};
             prj_usb_cdc_send((uint8_t*) errstr, strlen(errstr));
             return 0;
@@ -146,47 +145,58 @@ int8_t slcan_parse_str(uint8_t* buf, uint8_t len) {
             Frame.Header.IDE = CAN_ID_EXT;
             break;
         case 't':
-            Frame.Header.RTR = CAN_RTR_DATA;
             break;
         case 'R':
             Frame.Header.IDE = CAN_ID_EXT;
+            Frame.Header.RTR = CAN_RTR_REMOTE;
             break;
         case 'r':
-            // Transmit remote frame command
             Frame.Header.RTR = CAN_RTR_REMOTE;
             break;
         default:
             debug_printf("ERROR: unknown command=%d\n", buf[0]);
             return -1;
     }
-
-
-    // Save CAN ID depending on ID type
+    const uint8_t id_len = (Frame.Header.IDE == CAN_ID_EXT) ? SLCAN_EXT_ID_LEN : SLCAN_STD_ID_LEN;
+    if (len < (uint8_t) (1 + id_len + 1))
+        return -1;
     uint8_t msg_position = 1;
     if (Frame.Header.IDE == CAN_ID_EXT) {
         while (msg_position <= SLCAN_EXT_ID_LEN) {
+            uint8_t nibble;
+            if (!slcan_hex_to_u4(buf[msg_position], &nibble))
+                return -1;
             Frame.Header.ExtId *= 16;
-            Frame.Header.ExtId += buf[msg_position++];
+            Frame.Header.ExtId += nibble;
+            msg_position++;
         }
     } else {
         while (msg_position <= SLCAN_STD_ID_LEN) {
+            uint8_t nibble;
+            if (!slcan_hex_to_u4(buf[msg_position], &nibble))
+                return -1;
             Frame.Header.StdId *= 16;
-            Frame.Header.StdId += buf[msg_position++];
+            Frame.Header.StdId += nibble;
+            msg_position++;
         }
     }
-
-
-    // Attempt to parse DLC and check sanity
-    Frame.Header.DLC = buf[msg_position++];
-    if (Frame.Header.DLC > 8) {
+    uint8_t dlc;
+    if (!slcan_hex_to_u4(buf[msg_position++], &dlc) || dlc > 8)
         return -1;
+    Frame.Header.DLC           = dlc;
+    const bool remote          = Frame.Header.RTR == CAN_RTR_REMOTE;
+    const uint8_t expected_len = 1 + id_len + 1 + (remote ? 0 : dlc * 2);
+    if (len != expected_len)
+        return -1;
+    if (!remote) {
+        for (uint32_t j = 0; j < Frame.Header.DLC; j++) {
+            uint8_t hi;
+            uint8_t lo;
+            if (!slcan_hex_to_u4(buf[msg_position], &hi) || !slcan_hex_to_u4(buf[msg_position + 1], &lo))
+                return -1;
+            Frame.Body[j] = (hi << 4) | lo;
+            msg_position += 2;
+        }
     }
-
-    // Copy frame data to buffer
-    for (uint8_t j = 0; j < Frame.Header.DLC; j++) {
-        Frame.Body[j] = (buf[msg_position] << 4) + buf[msg_position + 1];
-        msg_position += 2;
-    }
-    prj_can_bus_send(&Frame);
-    return 0;
+    return prj_can_bus_send(&Frame) == HAL_OK ? 0 : -1;
 }
