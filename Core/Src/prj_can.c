@@ -2,10 +2,26 @@
 #include "circular-buffer.h"
 #include "discrete_output.h"
 #include "error.h"
-#include "prj_cdc_usb.h"
+#include "prj_usb_cdc.h"
 #include "slcan.h"
 #include "stm32f0xx_hal.h"
 #include "utils_conf.h"
+
+#ifdef DEBUG
+extern Statistics_t Statistics;
+#endif
+
+#ifdef DEBUG
+#define INCREASE_STAT_INCOMING_QUEUE_OVERFLOW() INCREASE_STATISTIC_CNT(Statistics.canBusIncomingQueueOverflow)
+#else
+#define INCREASE_STAT_INCOMING_QUEUE_OVERFLOW() __NOP()
+#endif
+
+#ifdef DEBUG
+#define INCREASE_STAT_OUTGOING_QUEUE_OVERFLOW() INCREASE_STATISTIC_CNT(Statistics.canBusOutgoingQueueOverflow)
+#else
+#define INCREASE_STAT_OUTGOING_QUEUE_OVERFLOW() __NOP()
+#endif
 
 extern DiscreteOutput_t LedRed;
 extern DiscreteOutput_t LedBlue;
@@ -24,8 +40,8 @@ static PrjCanBus_t PrjCanBus;
 static rxCanBusFrame_t rxCanBusTmpBuf = {0};
 static txCanBusFrame_t txCanBusTmpBuf = {0};
 
-#define RX_CAN_BUS_QUEUE_FRAME_CNT 24
-#define TX_CAN_BUS_QUEUE_FRAME_CNT 24
+#define RX_CAN_BUS_QUEUE_FRAME_CNT 16
+#define TX_CAN_BUS_QUEUE_FRAME_CNT 48
 static rxCanBusFrame_t rxCanBusBuffer[RX_CAN_BUS_QUEUE_FRAME_CNT];
 static txCanBusFrame_t txCanBusBuffer[TX_CAN_BUS_QUEUE_FRAME_CNT];
 static CBuf_t* rxCanBusQueue;
@@ -75,8 +91,10 @@ bool prj_can_bus_set_silent(const bool enable) {
     return true;
 }
 
-// Callback for FIFO0 full
-void HAL_CAN_RxFifo0FullCallback(CAN_HandleTypeDef* hcan) { error_assert(ERR_CANRXFIFO_OVERFLOW); }
+void HAL_CAN_RxFifo0FullCallback(CAN_HandleTypeDef* hcan) {
+    (void) hcan;
+    error_assert(ERR_CANRXFIFO_OVERFLOW);
+}
 
 bool prj_can_bus_init(void) {
     rxCanBusQueue = CBUF_INIT(rxCanBusBuffer, true);
@@ -151,8 +169,8 @@ bool prj_can_bus_enable(void) {
 
 void prj_can_bus_disable(void) {
     if (PrjCanBus.bus_state == ON_BUS) {
-        // Do a bxCAN reset (set RESET bit to 1)
-        PrjCanBus.handle.Instance->MCR |= CAN_MCR_RESET;
+        HAL_CAN_Stop(&PrjCanBus.handle);
+        HAL_CAN_DeInit(&PrjCanBus.handle);
         PrjCanBus.bus_state = OFF_BUS;
     }
     cb_clear(txCanBusQueue);
@@ -198,7 +216,7 @@ uint32_t prj_can_bus_send(const txCanBusFrame_t* frame) {
         return HAL_ERROR;
     }
     if (!cb_push(txCanBusQueue, (txCanBusFrame_t*) frame)) {
-        debug_printf("ERROR: Cannot push CANBUS TX frame into queue!\n");
+        INCREASE_STAT_OUTGOING_QUEUE_OVERFLOW();
         return HAL_ERROR;
     }
     return HAL_OK;
@@ -218,7 +236,8 @@ CAN_HandleTypeDef* prj_can_bus_get_handle(void) { return &PrjCanBus.handle; }
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef* hcan) {
     rxCanBusFrame_t frame;
     if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &frame.Header, frame.Body) == HAL_OK) {
-        if (!cb_push(rxCanBusQueue, &frame))
-            debug_printf("ERROR: Cannot push CAN RX frame into queue!\n");
+        if (!cb_push(rxCanBusQueue, &frame)) {
+            INCREASE_STAT_INCOMING_QUEUE_OVERFLOW();
+        }
     }
 }

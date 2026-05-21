@@ -1,14 +1,28 @@
-#include "prj_cdc_usb.h"
 #include "circular-buffer.h"
 #include "error.h"
+#include "prj_usb_cdc.h"
 #include "slcan.h"
 #include "usbd_cdc.h"
 #include "utils.h"
 #include "utils_conf.h"
 
-extern USBD_HandleTypeDef hUsbDeviceFS;
+#ifdef DEBUG
+extern Statistics_t Statistics;
+#endif
 
-static const char* TAG = "PRJ_USB_CDC";
+#ifdef DEBUG
+#define INCREASE_STAT_INCOMING_QUEUE_OVERFLOW() INCREASE_STATISTIC_CNT(Statistics.usbCdcIncomingQueueOverflow)
+#else
+#define INCREASE_STAT_INCOMING_QUEUE_OVERFLOW() __NOP()
+#endif
+
+#ifdef DEBUG
+#define INCREASE_STAT_OUTGOING_QUEUE_OVERFLOW() INCREASE_STATISTIC_CNT(Statistics.usbCdcOutgoingQueueOverflow)
+#else
+#define INCREASE_STAT_OUTGOING_QUEUE_OVERFLOW() __NOP()
+#endif
+
+extern USBD_HandleTypeDef hUsbDeviceFS;
 
 typedef struct rxFrame_ {
     uint8_t* buf;
@@ -76,7 +90,6 @@ bool prj_usb_cdc_init(void) {
         ))
         return false;
     // clang-format on
-    debug_printf("%s initialized\n", TAG);
     return true;
 }
 
@@ -138,6 +151,7 @@ bool prj_usb_cdc_send(const uint8_t* buf, const uint32_t len) {
     Frame.len = len;
     if (!cb_push(PrjUsbCdc.Tx.Queue.Handle, &Frame)) {
         static_mem_pool_free(&PrjUsbCdc.Tx.MemPool.Handle, pool);
+        INCREASE_STAT_OUTGOING_QUEUE_OVERFLOW();
         return false;
     }
     return true;
@@ -196,7 +210,7 @@ bool prj_usb_cdc_on_incoming_message(uint8_t* buf, const uint32_t* len) {
     Frame.len = *len;
     if (!cb_push(PrjUsbCdc.Rx.Queue.Handle, &Frame)) {
         static_mem_pool_free(&PrjUsbCdc.Rx.MemPool.Handle, buf);
-        debug_printf("ERROR: cannot push RX USB frame!\n");
+        INCREASE_STAT_INCOMING_QUEUE_OVERFLOW();
         error_assert(ERR_FULLBUF_USBRX);
     }
     PrjUsbCdc.Rx.activeBuffer = next;

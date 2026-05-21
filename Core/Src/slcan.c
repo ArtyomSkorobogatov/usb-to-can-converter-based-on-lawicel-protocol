@@ -1,7 +1,7 @@
 #include "slcan.h"
 #include <string.h>
 #include "prj_can.h"
-#include "prj_cdc_usb.h"
+#include "prj_usb_cdc.h"
 #include "stm32f0xx_hal.h"
 #include "utils_conf.h"
 

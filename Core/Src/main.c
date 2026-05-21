@@ -24,7 +24,7 @@
 /* USER CODE BEGIN Includes */
 #include "discrete_output.h"
 #include "prj_can.h"
-#include "prj_cdc_usb.h"
+#include "prj_usb_cdc.h"
 #include "slcan.h"
 #include "usbd_cdc_if.h"
 #include "utils_conf.h"
@@ -57,7 +57,9 @@ uint8_t cdc_message_buf[SLCAN_MTU];
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 /* USER CODE BEGIN PFP */
-
+#ifdef DEBUG
+Statistics_t Statistics = {0};
+#endif
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -107,6 +109,9 @@ int main(void) {
     /* USER CODE BEGIN WHILE */
     discrete_output_meander_start(&LedRed, 250, 250, 2);
     discrete_output_meander_start(&LedBlue, 250, 250, 2);
+#ifdef DEBUG
+    uint32_t ts_ms = HAL_GetTick();
+#endif
     debug_printf("\nProgram started\n");
 
     while (1) {
@@ -114,6 +119,17 @@ int main(void) {
         discrete_output_run(&LedBlue);
         prj_usb_cdc_run();
         prj_can_bus_run();
+#ifdef DEBUG
+        uint32_t now_ms = HAL_GetTick();
+        if (now_ms - ts_ms > 5000) {
+            ts_ms = now_ms;
+            debug_printf("\nStatistic (time=%d ms):\n", now_ms);
+            debug_printf("\tCanBus outgoing queue overflow = %d\n", Statistics.canBusOutgoingQueueOverflow);
+            debug_printf("\tCanBus incoming queue overflow = %d\n", Statistics.canBusIncomingQueueOverflow);
+            debug_printf("\tUSB CDC outgoing queue overflow = %d\n", Statistics.usbCdcOutgoingQueueOverflow);
+            debug_printf("\tUSB CDC incoming queue overflow = %d\n", Statistics.usbCdcIncomingQueueOverflow);
+        }
+#endif
         /* USER CODE END WHILE */
 
         /* USER CODE BEGIN 3 */
