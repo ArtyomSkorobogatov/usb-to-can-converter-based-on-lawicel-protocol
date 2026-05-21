@@ -5,10 +5,8 @@
 #include "slcan.h"
 #include <string.h>
 #include "prj_can.h"
-#include "error.h"
-#include "printf.h"
+#include "prj_cdc_usb.h"
 #include "stm32f0xx_hal.h"
-#include "usbd_cdc_if.h"
 #include "utils_conf.h"
 
 // Parse an incoming CAN frame into an outgoing slcan message
@@ -72,19 +70,10 @@ size_t slcan_parse_frame(uint8_t* buf, const rxCanBusFrame_t* frame) {
     return msg_position;
 }
 
-static void _print_cdc(uint8_t* buf, uint8_t len) {
-    debug_printf("CDC Command: ");
-    for (uint8_t i = 0; i < len; i++){
-        debug_printf("%c", buf[i]);
-    }
-    debug_printf("\n");
-}
-
 
 // Parse an incoming slcan command from the USB CDC port
 int8_t slcan_parse_str(uint8_t* buf, uint8_t len) {
     // CAN_TxHeaderTypeDef frame_header;
-    _print_cdc(buf, len);
     txCanBusFrame_t Frame = {0};
     // Default to standard ID unless otherwise specified
     Frame.Header.IDE   = CAN_ID_STD;
@@ -150,7 +139,7 @@ int8_t slcan_parse_str(uint8_t* buf, uint8_t len) {
         case 'E': {
             // Report error register
             char errstr[64] = {0};
-            CDC_Transmit_FS((uint8_t*) errstr, strlen(errstr));
+            prj_usb_cdc_send((uint8_t*) errstr, strlen(errstr));
             return 0;
         }
         case 'T':

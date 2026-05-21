@@ -22,7 +22,6 @@
 #include "usbd_cdc_if.h"
 
 /* USER CODE BEGIN INCLUDE */
-#include "error.h"
 #include "prj_cdc_usb.h"
 /* USER CODE END INCLUDE */
 
@@ -32,8 +31,6 @@
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-static uint8_t txbuf[TX_BUF_SIZE];
-extern USBD_HandleTypeDef hUsbDeviceFS;
 
 /* USER CODE END PV */
 
@@ -147,7 +144,6 @@ USBD_CDC_ItfTypeDef USBD_Interface_fops_FS = {CDC_Init_FS, CDC_DeInit_FS, CDC_Co
 static int8_t CDC_Init_FS(void) {
     /* USER CODE BEGIN 3 */
     /* Set Application Buffers */
-    USBD_CDC_SetTxBuffer(&hUsbDeviceFS, txbuf, 0);
     if (!prj_usb_cdc_set_buffers())
         return USBD_FAIL;
     return (USBD_OK);
@@ -280,31 +276,8 @@ static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t* Len) {
 uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len) {
     uint8_t result = USBD_OK;
     /* USER CODE BEGIN 7 */
-    // Attempt to transmit on USB, wait until not busy
-    // Future: implement TX buffering
-    uint32_t start_wait = HAL_GetTick();
-    while (((USBD_CDC_HandleTypeDef*) hUsbDeviceFS.pClassData)->TxState) {
-        // If no TX within timeout, abort.
-        if (HAL_GetTick() - start_wait >= 10) {
-            error_assert(ERR_USBTX_BUSY);
-            return USBD_BUSY;
-        }
-    }
-
-    // Ensure message will fit in buffer
-    if (Len > TX_BUF_SIZE) {
-        return 0;
-    }
-
-    // Copy data into buffer
-    for (uint32_t i = 0; i < Len; i++) {
-        txbuf[i] = Buf[i];
-    }
-
-    // Set transmit buffer and start TX
-    USBD_CDC_SetTxBuffer(&hUsbDeviceFS, txbuf, Len);
-    result = USBD_CDC_TransmitPacket(&hUsbDeviceFS);
-
+    (void)Buf;
+    (void)Len;
     /* USER CODE END 7 */
     return result;
 }

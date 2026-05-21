@@ -87,7 +87,7 @@ int main(void) {
     SystemClock_Config();
 
     /* USER CODE BEGIN SysInit */
-    if (!prj_usb_cdc_init_buffers())
+    if (!prj_usb_cdc_init())
         Error_Handler();
     /* USER CODE END SysInit */
 
