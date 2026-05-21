@@ -67,15 +67,6 @@
   */
 
 /* USER CODE BEGIN EXPORTED_TYPES */
- typedef struct _usbrx_buf_
- {
-  // Receive buffering: circular buffer FIFO
-  uint8_t buf[NUM_RX_BUFS][RX_BUF_SIZE];
-  uint32_t msglen[NUM_RX_BUFS];
-  uint8_t head;
-  uint8_t tail;
-
- } usbrx_buf_t;
 /* USER CODE END EXPORTED_TYPES */
 
 /**
@@ -119,7 +110,6 @@ extern USBD_CDC_ItfTypeDef USBD_Interface_fops_FS;
 uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len);
 
 /* USER CODE BEGIN EXPORTED_FUNCTIONS */
-void cdc_process(void);
 /* USER CODE END EXPORTED_FUNCTIONS */
 
 /**

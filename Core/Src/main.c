@@ -24,6 +24,7 @@
 /* USER CODE BEGIN Includes */
 #include "discrete_output.h"
 #include "prj_can.h"
+#include "prj_cdc_usb.h"
 #include "slcan.h"
 #include "usbd_cdc_if.h"
 #include "utils_conf.h"
@@ -86,7 +87,8 @@ int main(void) {
     SystemClock_Config();
 
     /* USER CODE BEGIN SysInit */
-
+    if (!prj_usb_cdc_init_buffers())
+        Error_Handler();
     /* USER CODE END SysInit */
 
     /* Initialize all configured peripherals */
@@ -108,9 +110,9 @@ int main(void) {
     debug_printf("\nProgram started\n");
 
     while (1) {
-        cdc_process();
         discrete_output_run(&LedRed);
         discrete_output_run(&LedBlue);
+        prj_usb_cdc_run();
         prj_can_bus_run();
         /* USER CODE END WHILE */
 
