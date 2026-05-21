@@ -116,27 +116,37 @@ bool prj_can_bus_init(void) {
     return true;
 }
 
-void prj_can_bus_enable(void) {
-    if (PrjCanBus.bus_state == OFF_BUS) {
-        PrjCanBus.handle.Init.Prescaler            = PrjCanBus.prescaler;
-        PrjCanBus.handle.Init.Mode                 = PrjCanBus.silentMode;
-        PrjCanBus.handle.Init.SyncJumpWidth        = CAN_SJW_1TQ;
-        PrjCanBus.handle.Init.TimeSeg1             = CAN_BS1_4TQ;
-        PrjCanBus.handle.Init.TimeSeg2             = CAN_BS2_3TQ;
-        PrjCanBus.handle.Init.TimeTriggeredMode    = DISABLE;
-        PrjCanBus.handle.Init.AutoBusOff           = ENABLE;
-        PrjCanBus.handle.Init.AutoWakeUp           = DISABLE;
-        PrjCanBus.handle.Init.AutoRetransmission   = PrjCanBus.auto_retransmit;
-        PrjCanBus.handle.Init.ReceiveFifoLocked    = DISABLE;
-        PrjCanBus.handle.Init.TransmitFifoPriority = ENABLE;
-        HAL_CAN_Init(&PrjCanBus.handle);
-        HAL_CAN_ConfigFilter(&PrjCanBus.handle, &PrjCanBus.filter);
-        HAL_CAN_Start(&PrjCanBus.handle);
-        HAL_CAN_ActivateNotification(&PrjCanBus.handle, CAN_IT_RX_FIFO0_MSG_PENDING);
-        PrjCanBus.bus_state = ON_BUS;
+bool prj_can_bus_enable(void) {
+    if (PrjCanBus.bus_state == ON_BUS)
+        return true;
+
+    PrjCanBus.handle.Init.Prescaler            = PrjCanBus.prescaler;
+    PrjCanBus.handle.Init.Mode                 = PrjCanBus.silentMode;
+    PrjCanBus.handle.Init.SyncJumpWidth        = CAN_SJW_1TQ;
+    PrjCanBus.handle.Init.TimeSeg1             = CAN_BS1_4TQ;
+    PrjCanBus.handle.Init.TimeSeg2             = CAN_BS2_3TQ;
+    PrjCanBus.handle.Init.TimeTriggeredMode    = DISABLE;
+    PrjCanBus.handle.Init.AutoBusOff           = ENABLE;
+    PrjCanBus.handle.Init.AutoWakeUp           = DISABLE;
+    PrjCanBus.handle.Init.AutoRetransmission   = PrjCanBus.auto_retransmit;
+    PrjCanBus.handle.Init.ReceiveFifoLocked    = DISABLE;
+    PrjCanBus.handle.Init.TransmitFifoPriority = ENABLE;
+
+    if (HAL_CAN_Init(&PrjCanBus.handle) != HAL_OK ||
+        HAL_CAN_ConfigFilter(&PrjCanBus.handle, &PrjCanBus.filter) != HAL_OK ||
+        HAL_CAN_Start(&PrjCanBus.handle) != HAL_OK ||
+        HAL_CAN_ActivateNotification(&PrjCanBus.handle, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK) {
+        error_assert(ERR_PERIPHINIT);
+        PrjCanBus.bus_state = OFF_BUS;
         discrete_output_reset(&LedBlue);
-        discrete_output_set(&LedBlue, true);
+        discrete_output_set(&LedBlue, false);
+        return false;
     }
+
+    PrjCanBus.bus_state = ON_BUS;
+    discrete_output_reset(&LedBlue);
+    discrete_output_set(&LedBlue, true);
+    return true;
 }
 
 void prj_can_bus_disable(void) {
@@ -145,6 +155,7 @@ void prj_can_bus_disable(void) {
         PrjCanBus.handle.Instance->MCR |= CAN_MCR_RESET;
         PrjCanBus.bus_state = OFF_BUS;
     }
+    cb_clear(txCanBusQueue);
     discrete_output_reset(&LedBlue);
     discrete_output_set(&LedBlue, false);
 }
@@ -159,6 +170,8 @@ void prj_can_bus_run(void) {
         if (cdc_msg_len)
             prj_usb_cdc_send(cdc_message_buf, cdc_msg_len);
     }
+    if (PrjCanBus.bus_state != ON_BUS)
+        return;
     if (cb_is_empty(txCanBusQueue) || HAL_CAN_GetTxMailboxesFreeLevel(&PrjCanBus.handle) < 1)
         return;
     if (!cb_pop(txCanBusQueue, &txCanBusTmpBuf)) {
@@ -176,6 +189,10 @@ void prj_can_bus_run(void) {
 }
 
 uint32_t prj_can_bus_send(const txCanBusFrame_t* frame) {
+    if (PrjCanBus.bus_state != ON_BUS) {
+        debug_printf("ERROR: cannot queue CANBUS TX frame while bus is off\n");
+        return HAL_ERROR;
+    }
     if (cb_is_full(txCanBusQueue)) {
         debug_printf("ERROR: CANBUS TX queue is full!\n");
         return HAL_ERROR;

@@ -170,6 +170,8 @@ static int8_t CDC_DeInit_FS(void) {
  */
 static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length) {
     /* USER CODE BEGIN 5 */
+    (void)pbuf;
+    (void)length;
     switch (cmd) {
         case CDC_SEND_ENCAPSULATED_COMMAND:
 
@@ -253,26 +255,6 @@ static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t* Len) {
         return USBD_FAIL;
     return USBD_OK;
     /* USER CODE END 6 */
-}
-
-/**
- * @brief  CDC_Transmit_FS
- *         Data to send over USB IN endpoint are sent over CDC interface
- *         through this function.
- *         @note
- *
- *
- * @param  Buf: Buffer of data to be sent
- * @param  Len: Number of data to be sent (in bytes)
- * @retval USBD_OK if all operations are OK else USBD_FAIL or USBD_BUSY
- */
-uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len) {
-    uint8_t result = USBD_OK;
-    /* USER CODE BEGIN 7 */
-    (void)Buf;
-    (void)Len;
-    /* USER CODE END 7 */
-    return result;
 }
 
 /* USER CODE BEGIN PRIVATE_FUNCTIONS_IMPLEMENTATION */

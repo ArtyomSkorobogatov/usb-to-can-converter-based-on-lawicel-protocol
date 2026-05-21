@@ -93,8 +93,7 @@ int8_t slcan_parse_str(uint8_t* buf, uint8_t len) {
             if (len != 1)
                 return -1;
             debug_printf("OPEN command\n");
-            prj_can_bus_enable();
-            return 0;
+            return prj_can_bus_enable() ? 0 : -1;
         case 'C':
             if (len != 1)
                 return -1;

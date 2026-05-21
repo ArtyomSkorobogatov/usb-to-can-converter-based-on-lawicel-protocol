@@ -35,7 +35,7 @@ typedef struct txCanBusFrame_ {
 
 bool prj_can_bus_init(void);
 void prj_can_bus_run(void);
-void prj_can_bus_enable(void);
+bool prj_can_bus_enable(void);
 void prj_can_bus_disable(void);
 CAN_HandleTypeDef* prj_can_bus_get_handle(void);
 void prj_can_bus_set_auto_retransmit(bool enable);
