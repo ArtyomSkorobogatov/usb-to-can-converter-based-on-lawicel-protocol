@@ -35,6 +35,7 @@ typedef struct PrjUsbCdc_ {
         } Queue;
     } Rx;
     struct {
+        uint8_t* activeBuffer;
         struct {
             StaticMemPool_t Handle;
             bool poolUsed[TX_FRAME_CNT];
@@ -82,19 +83,26 @@ bool prj_usb_cdc_init(void) {
 static bool usb_cdc_tx_ready(void) {
     if (hUsbDeviceFS.dev_state != USBD_STATE_CONFIGURED)
         return false;
-    USBD_CDC_HandleTypeDef* hcdc =
-        (USBD_CDC_HandleTypeDef*) hUsbDeviceFS.pClassData;
+    USBD_CDC_HandleTypeDef* hcdc = (USBD_CDC_HandleTypeDef*) hUsbDeviceFS.pClassData;
     if (hcdc == NULL)
         return false;
     return hcdc->TxState == 0;
 }
 
 void prj_usb_cdc_run(void) {
+    if (PrjUsbCdc.Tx.activeBuffer != NULL && usb_cdc_tx_ready()) {
+        static_mem_pool_free(&PrjUsbCdc.Tx.MemPool.Handle, PrjUsbCdc.Tx.activeBuffer);
+        PrjUsbCdc.Tx.activeBuffer = NULL;
+    }
     if (!cb_is_empty(PrjUsbCdc.Tx.Queue.Handle) && usb_cdc_tx_ready()) {
         Frame_t Frame;
         if (cb_pop(PrjUsbCdc.Tx.Queue.Handle, &Frame)) {
             USBD_CDC_SetTxBuffer(&hUsbDeviceFS, Frame.buf, Frame.len);
-            USBD_CDC_TransmitPacket(&hUsbDeviceFS);
+            if (USBD_CDC_TransmitPacket(&hUsbDeviceFS) == USBD_OK) {
+                PrjUsbCdc.Tx.activeBuffer = Frame.buf;
+            } else {
+                static_mem_pool_free(&PrjUsbCdc.Tx.MemPool.Handle, Frame.buf);
+            }
         }
     }
     if (cb_is_empty(PrjUsbCdc.Rx.Queue.Handle))
@@ -155,6 +163,9 @@ bool prj_usb_cdc_reset_buffers(void) {
     if (PrjUsbCdc.Rx.activeBuffer)
         static_mem_pool_free(&PrjUsbCdc.Rx.MemPool.Handle, PrjUsbCdc.Rx.activeBuffer);
     PrjUsbCdc.Rx.activeBuffer = NULL;
+    if (PrjUsbCdc.Tx.activeBuffer)
+        static_mem_pool_free(&PrjUsbCdc.Tx.MemPool.Handle, PrjUsbCdc.Tx.activeBuffer);
+    PrjUsbCdc.Tx.activeBuffer = NULL;
     while (!cb_is_empty(PrjUsbCdc.Rx.Queue.Handle)) {
         Frame_t Frame;
         if (!cb_pop(PrjUsbCdc.Rx.Queue.Handle, &Frame))

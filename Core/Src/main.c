@@ -105,8 +105,8 @@ int main(void) {
 
     /* Infinite loop */
     /* USER CODE BEGIN WHILE */
-    discrete_output_meander_start(&LedRed, 500, 500, 2);
-    discrete_output_meander_start(&LedBlue, 500, 500, 2);
+    discrete_output_meander_start(&LedRed, 250, 250, 2);
+    discrete_output_meander_start(&LedBlue, 250, 250, 2);
     debug_printf("\nProgram started\n");
 
     while (1) {

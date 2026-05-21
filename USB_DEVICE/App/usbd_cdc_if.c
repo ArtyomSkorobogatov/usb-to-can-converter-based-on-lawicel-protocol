@@ -149,13 +149,6 @@ static int8_t CDC_Init_FS(void) {
     return (USBD_OK);
     /* USER CODE END 3 */
 }
-//
-// static int8_t CDC_Init_FS(void)
-// {
-//   USBD_CDC_SetTxBuffer(&hUsbDeviceFS, txbuf, 0);
-//   USBD_CDC_SetRxBuffer(&hUsbDeviceFS, rxbuf.buf[rxbuf.head]);
-//   return (USBD_OK);
-// }
 
 /**
  * @brief  DeInitializes the CDC media low layer
