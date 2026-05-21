@@ -212,7 +212,7 @@ uint32_t prj_can_bus_send(const txCanBusFrame_t* frame) {
         return HAL_ERROR;
     }
     if (cb_is_full(txCanBusQueue)) {
-        debug_printf("ERROR: CANBUS TX queue is full!\n");
+        INCREASE_STAT_OUTGOING_QUEUE_OVERFLOW();
         return HAL_ERROR;
     }
     if (!cb_push(txCanBusQueue, (txCanBusFrame_t*) frame)) {
