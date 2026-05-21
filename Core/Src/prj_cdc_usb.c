@@ -125,7 +125,10 @@ bool prj_usb_cdc_send(const uint8_t* buf, const uint32_t len) {
     if (pool == NULL)
         return false;
     memcpy(pool, buf, len);
-    if (cb_push(PrjUsbCdc.Tx.Queue.Handle, pool)) {
+    Frame_t Frame;
+    Frame.buf = pool;
+    Frame.len = len;
+    if (!cb_push(PrjUsbCdc.Tx.Queue.Handle, &Frame)) {
         static_mem_pool_free(&PrjUsbCdc.Tx.MemPool.Handle, pool);
         return false;
     }
