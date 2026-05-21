@@ -1,78 +1,163 @@
-# USB to CAN adapter Lawicel-based
+# USB to CAN adapter, Lawicel/SLCAN based
 
-Преобразователь USB в CAN, основанный на протоколе Lawicel.
-Проект является форком проекта https://github.com/normaldotcom/canable-fw.
-Адаптирован для работы с платой переходника CANable DykbRadio v1.0 Pro на базе STM32F072C8:
-![adapter-tot-view](images/CANable_top.png)
+Прошивка USB-CAN адаптера на базе STM32F072C8. Устройство подключается к компьютеру по USB, определяется как виртуальный COM-порт USB CDC и обменивается CAN-кадрами через текстовый протокол Lawicel/SLCAN.
+
+Проект является форком [canable-fw](https://github.com/normaldotcom/canable-fw), который основан на прошивке CANtact. Текущая версия адаптирована для платы CANable DykbRadio v1.0 Pro на базе STM32F072C8.
+
+![adapter-top-view](images/CANable_top.png)
 ![adapter-bottom-view](images/CANable_bottom.png)
 
-This repository contains sources for the slcan CANable firmware, based off of the CANtact firwmare. This firmware may still compile and run on the CANtact.
+## Назначение
+
+Прошивка предназначена для внутреннего использования в качестве простого USB-CAN интерфейса. С компьютера можно:
+
+- настроить скорость CAN-шины;
+- открыть или закрыть CAN-канал;
+- отправлять standard и extended CAN-кадры;
+- отправлять data и remote frames;
+- принимать CAN-кадры из шины в формате SLCAN.
+
+## Принцип работы
+
+После подключения к USB устройство запускает USB CDC интерфейс. Управляющая программа на компьютере отправляет в COM-порт строки SLCAN, завершённые символом `\r`. Прошивка принимает эти строки, разбирает команды и передаёт CAN-кадры в аппаратный контроллер bxCAN.
+
+Перед передачей CAN-кадров нужно настроить параметры шины. Обычно последовательность такая:
+
+1. Выбрать скорость командой `S0`...`S8`.
+2. При необходимости выбрать режим `M0` или `M1`.
+3. При необходимости настроить автоматическую повторную передачу `A0` или `A1`.
+4. Открыть канал командой `O`.
+5. Передавать CAN-кадры командами `t`, `T`, `r`, `R`.
+6. Закрыть канал командой `C`.
+
+Пока канал открыт, входящие SLCAN-команды помещаются во внутреннюю очередь CAN TX и затем отправляются через аппаратные transmit mailboxes bxCAN. При закрытии канала очередь ожидающих отправки CAN-кадров очищается.
+
+Кадры, принятые из CAN-шины, обрабатываются в CAN interrupt context, помещаются в очередь CAN RX, затем в основном цикле преобразуются обратно в SLCAN-строки и отправляются на компьютер через USB CDC.
+
+Для USB RX/TX и CAN RX/TX используются очереди и статические буферы. Это позволяет держать обработчики прерываний короткими и выполнять разбор протокола в основном цикле.
+
+## Ограничения и особенности
+
+- Команды настройки канала нужно отправлять до `O`.
+- Передача CAN-кадров разрешена только после успешного открытия канала командой `O`.
+- Прошивка не отправляет ACK/NACK на каждую SLCAN-команду.
+- Если компьютер отправляет кадры быстрее, чем CAN-шина успевает их передавать, очередь CAN TX может заполниться.
+- Переполнение CAN TX особенно вероятно, если на шине нет второго активного узла, который подтверждает кадры ACK, если шина плохо терминирована или если включена автоматическая повторная передача.
+- Команды `V` и `E` зарезервированы в коде, но сейчас не являются полноценным пользовательским интерфейсом.
 
 ## Светодиоды
+
 На плате расположены три светодиода: зелёный, красный и синий.
-Зелёный индицирует подачу питания на плату. Красный и синий управляются программно. Логика следующая:
-- синий светится постоянно, пока "открыто" Lawicel соединение;
-- красный вспыхивает в момент прохождения пакета на CAN-шине.
 
-## Supported Commands
+- Зелёный светодиод аппаратно показывает наличие питания.
+- Синий светится постоянно, пока CAN-канал открыт командой `O`.
+- Красный вспыхивает при передаче CAN-кадра.
 
-- `O` - Open channel 
-- `C` - Close channel 
-- `S0` - Set bitrate to 10k
-- `S1` - Set bitrate to 20k
-- `S2` - Set bitrate to 50k
-- `S3` - Set bitrate to 100k
-- `S4` - Set bitrate to 125k
-- `S5` - Set bitrate to 250k
-- `S6` - Set bitrate to 500k
-- `S7` - Set bitrate to 750k
-- `S8` - Set bitrate to 1M
-- `M0` - Set mode to normal mode (default)
-- `M1` - Set mode to silent mode
-- `A0` - Disable automatic retransmission 
-- `A1` - Enable automatic retransmission (default)
-- `TIIIIIIIILDD...` - Transmit data frame (Extended ID) [ID, length, data]
-- `tIIILDD...` - Transmit data frame (Standard ID) [ID, length, data]
-- `RIIIIIIIIL` - Transmit remote frame (Extended ID) [ID, length]
-- `rIIIL` - Transmit remote frame (Standard ID) [ID, length]
-- `V` - Returns firmware version and remote path as a string
+## Поддерживаемые команды
 
-Note: Channel configuration commands must be sent before opening the channel. The channel must be opened before transmitting frames.
+Команды отправляются в USB CDC COM-порт и должны завершаться `\r`.
 
-This firmware currently does not provide any ACK/NACK feedback for serial commands.
+| Команда | Описание |
+| --- | --- |
+| `O` | Открыть CAN-канал |
+| `C` | Закрыть CAN-канал |
+| `S0` | Установить bitrate 10 kbit/s |
+| `S1` | Установить bitrate 20 kbit/s |
+| `S2` | Установить bitrate 50 kbit/s |
+| `S3` | Установить bitrate 100 kbit/s |
+| `S4` | Установить bitrate 125 kbit/s |
+| `S5` | Установить bitrate 250 kbit/s |
+| `S6` | Установить bitrate 500 kbit/s |
+| `S7` | Установить bitrate 750 kbit/s |
+| `S8` | Установить bitrate 1 Mbit/s |
+| `M0` | Normal mode |
+| `M1` | Silent mode |
+| `A0` | Отключить automatic retransmission |
+| `A1` | Включить automatic retransmission |
+| `tIIILDD...` | Передать standard data frame |
+| `TIIIIIIIILDD...` | Передать extended data frame |
+| `rIIIL` | Передать standard remote frame |
+| `RIIIIIIIIL` | Передать extended remote frame |
+| `V` | Зарезервировано для версии прошивки |
 
-## Building
+Обозначения:
 
-Firmware builds with GCC. Specifically, you will need gcc-arm-none-eabi, which
-is packaged for Windows, OS X, and Linux on
-[Launchpad](https://launchpad.net/gcc-arm-embedded/+download). Download for your
-system and add the `bin` folder to your PATH.
+- `III` - standard 11-bit CAN ID в hex, 3 символа.
+- `IIIIIIII` - extended 29-bit CAN ID в hex, 8 символов.
+- `L` - DLC, от `0` до `8`.
+- `DD...` - данные кадра, два hex-символа на байт.
 
-Your Linux distribution may also have a prebuilt package for `arm-none-eabi-gcc`, check your distro's repositories to see if a build exists.
+Примеры:
 
-- If you have a CANable device, you can compile using `make`. 
-- If you have a CANtact or other device with external oscillator, you can compile using `make INTERNAL_OSCILLATOR=1`
+```text
+S4\r
+O\r
+t1230\r
+t12381122334455667788\r
+r1231\r
+C\r
+```
 
-## Flashing with the Bootloader
+## Диагностика
 
-Simply plug in your CANable with the BOOT jumper enabled (or depress the boot button on the CANable Pro while plugging in). Next, type `make flash` and your CANable will be updated to the latest firwmare. Unplug/replug the device after moving the boot jumper back, and your CANable will be up and running.
+В `DEBUG` сборке прошивка ведёт счётчики переполнения внутренних очередей:
 
-## Debugging
+- CAN TX queue overflow;
+- CAN RX queue overflow;
+- USB CDC TX queue overflow;
+- USB CDC RX queue overflow.
 
-Debugging and flashing can be done with any STM32 Discovery board as a
-programmer, or an st-link. You can also use other tools that support SWD.
+Статистика периодически выводится через SEGGER RTT. Эти счётчики полезны при нагрузочных тестах, когда нужно понять, какая часть системы не успевает: USB, SLCAN parser или CAN-шина.
 
-To use an STM32 Discovery, run [OpenOCD](http://openocd.sourceforge.net/) using
-the stm32f0x.cfg file: `openocd -f fw/stm32f0x.cfg`.
+Если растёт CAN TX overflow, сначала проверьте:
 
-With OpenOCD running, arm-none-eabi-gdb can be used to load code and debug.
+- есть ли второй активный CAN-узел, подтверждающий кадры ACK;
+- установлены ли терминаторы 120 Ом;
+- совпадает ли bitrate;
+- не включён ли silent mode;
+- не отправляет ли host кадры быстрее физической пропускной способности CAN-шины.
 
-## Contributors
+## Сборка
 
-- [Ethan Zonca](https://github.com/normaldotcom) - New features, HAL updates, Makefile fixes and code size optimization, updates for CANable
-- [onejope](https://github.com/onejope) - Fixes to extended ID handling
-- Phil Wise - Added dfu-util compatibility to Makefile
+Основная сборка проекта выполняется через CMake presets.
+
+Debug:
+
+```sh
+cmake --preset Debug
+cmake --build --preset Debug
+```
+
+Release:
+
+```sh
+cmake --preset Release
+cmake --build --preset Release
+```
+
+После сборки в каталоге `build/<Preset>` создаются файлы:
+
+- `usb-to-can-converter-based-on-lawicel-protocol.elf`;
+- `usb-to-can-converter-based-on-lawicel-protocol.hex`;
+- `usb-to-can-converter-based-on-lawicel-protocol.bin`.
+
+Для сборки нужен `arm-none-eabi-gcc`. На Windows можно использовать STM32CubeCLT или другой установленный GCC toolchain для ARM Embedded.
+
+## Прошивка
+
+Способ прошивки зависит от используемого оборудования:
+
+- через SWD/ST-Link из отладчика или внешнего flash tool;
+- через DFU bootloader, если плата загружена в boot mode и поддерживает DFU.
+
+Перед прошивкой убедитесь, что выбран файл из нужной конфигурации сборки, например `build/Release/*.bin` или `build/Release/*.hex`.
+
+## Отладка
+
+Для отладки можно использовать ST-Link, SWD и SEGGER RTT. В `DEBUG` сборке активен `debug_printf`, который выводит диагностические сообщения и статистику через RTT.
+
+При проблемах с передачей CAN сначала проверяйте физический уровень CAN-шины: питание трансивера, общий GND, терминаторы, bitrate и наличие второго узла для ACK.
 
 ## License
 
-See LICENSE.md
+See [LICENSE.md](../LICENSE.md).
