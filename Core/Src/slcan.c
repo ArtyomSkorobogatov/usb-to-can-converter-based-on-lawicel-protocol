@@ -60,10 +60,11 @@ size_t slcan_parse_frame(uint8_t* buf, const rxCanBusFrame_t* frame) {
     // Add DLC to buffer
     buf[msg_position++] = frame->Header.DLC;
 
-    // Add data bytes
-    for (size_t j = 0; j < frame->Header.DLC; j++) {
-        buf[msg_position++] = (frame->Body[j] >> 4);
-        buf[msg_position++] = (frame->Body[j] & 0x0F);
+    if (frame->Header.RTR == CAN_RTR_DATA) {
+        for (size_t j = 0; j < frame->Header.DLC; j++) {
+            buf[msg_position++] = (frame->Body[j] >> 4);
+            buf[msg_position++] = (frame->Body[j] & 0x0F);
+        }
     }
 
     // Convert to ASCII (2nd character to end)
